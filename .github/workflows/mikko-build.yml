@@ -3,12 +3,11 @@
 # so all downloads from one run can play together on a pure server.
 name: Mikko build
 
+# Every branch builds on push, so stacked PRs get a run too
 on:
   push:
-    branches: [master]
+    branches: ["**"]
     tags: ["v*"]
-  pull_request:
-    branches: [master]
   workflow_dispatch:
 
 concurrency:
