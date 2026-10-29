@@ -5,7 +5,8 @@
 #
 #   sh misc/macos/package-mac-app.sh <etlegacy-*-macOS.tar.gz> [VER]
 #
-# Environment: ET_PAKS_DIR (a folder with pak0.pk3, pak1.pk3 and pak2.pk3; downloaded from the
+# Environment: ET_BUNDLE_PAKS=1 puts the W:ET data inside the app (private builds only),
+# ET_PAKS_DIR (a folder with pak0.pk3, pak1.pk3 and pak2.pk3; downloaded from the
 # ET: Legacy mirror into dist/paks when unset).
 # The engine finds its data in Contents/Resources (see the self-contained bundle check in
 # sys_main.c) and writes config, downloads and logs to ~/Library/Application Support/etlegacy,
@@ -52,16 +53,19 @@ for f in "$SRC_DIR"/*; do
 done
 mkdir -p "$APP/Contents/Resources/etmain"
 
-# the original W:ET data, free to download but never committed to the repo
-PAKS=${ET_PAKS_DIR:-dist/paks}
-mkdir -p "$PAKS"
-for p in pak0.pk3 pak1.pk3 pak2.pk3; do
-	if [ ! -s "$PAKS/$p" ]; then
-		echo "downloading $p"
-		curl --fail -L --retry 3 -o "$PAKS/$p" "$MIRROR/$p"
-	fi
-	cp "$PAKS/$p" "$APP/Contents/Resources/etmain/$p"
-done
+# The original W:ET data is free to download but not ours to redistribute, so it only goes into
+# private builds (ET_BUNDLE_PAKS=1, e.g. built on Mikko's own Mac). Public builds leave etmain empty.
+if [ "$ET_BUNDLE_PAKS" = 1 ]; then
+	PAKS=${ET_PAKS_DIR:-dist/paks}
+	mkdir -p "$PAKS"
+	for p in pak0.pk3 pak1.pk3 pak2.pk3; do
+		if [ ! -s "$PAKS/$p" ]; then
+			echo "downloading $p"
+			curl --fail -L --retry 3 -o "$PAKS/$p" "$MIRROR/$p"
+		fi
+		cp "$PAKS/$p" "$APP/Contents/Resources/etmain/$p"
+	done
+fi
 
 PLIST="$APP/Contents/Info.plist"
 plutil -replace CFBundleIdentifier -string "ee.mikko.etlegacy" "$PLIST"

@@ -252,23 +252,17 @@ jobs:
             build/etlegacy-*.dmg
           if-no-files-found: error
 
-      - name: Cache W:ET data
-        uses: actions/cache@v4
-        with:
-          path: dist/paks
-          key: et-paks-v1
-
       - name: Build self-contained app and DMG
         shell: bash
         run: |
           sh misc/macos/package-mac-app.sh build/etlegacy-*-macOS.tar.gz "${CI_ETL_DESCRIBE#v}"
           app="dist/ET Legacy.app"
-          test -s "$app/Contents/Resources/etmain/pak0.pk3"
+          test -d "$app/Contents/Resources/etmain"
+          if ls "$app/Contents/Resources/etmain/"pak*.pk3 2>/dev/null; then echo "W:ET data must not be in public builds"; exit 1; fi
           test -d "$app/Contents/Resources/legacy"
           ls -la "$app/Contents/MacOS/" "$app/Contents/Resources/legacy"
           exe=$(plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")
           lipo -info "$app/Contents/MacOS/$exe"
-          for p in pak0 pak1 pak2; do unzip -tq "$app/Contents/Resources/etmain/$p.pk3"; done
 
       - uses: actions/upload-artifact@v7
         with:
