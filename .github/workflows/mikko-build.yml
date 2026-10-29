@@ -1,0 +1,291 @@
+# Fork build: Linux server, macOS universal app and Windows x64 from one commit.
+# Every platform shares the same version string and the same legacy_*.pk3,
+# so all downloads from one run can play together on a pure server.
+name: Mikko build
+
+# Every branch builds on push, so stacked PRs get a run too
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: mikko-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-build:
+    runs-on: ubuntu-latest
+    outputs:
+      describe: ${{ steps.git.outputs.describe }}
+      tag: ${{ steps.git.outputs.tag }}
+      uid: ${{ steps.git.outputs.uid }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Fetch git version information
+        id: git
+        run: |
+          # Forks don't always carry upstream's release tags, which git describe needs
+          git fetch --tags --force https://github.com/etlegacy/etlegacy.git
+          git_describe=$(git describe --abbrev=7 2>/dev/null | awk '{$1=$1};1')
+          git_tag=$(git describe --abbrev=0 2>/dev/null | awk '{$1=$1};1')
+          ci_id=$(uuidgen)
+          echo "Version info: $git_describe ?? $git_tag"
+          {
+            echo "describe=$git_describe"
+            echo "tag=$git_tag"
+            echo "uid=$ci_id"
+          } >> "$GITHUB_OUTPUT"
+
+  lnx64-mod:
+    runs-on: ubuntu-latest
+    needs: pre-build
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Build
+        uses: maus007/docker-run-action-fork@v1
+        with:
+          image: etlegacy/lnx-build:latest
+          options: -v ${{ github.workspace }}:/code -e CI_ETL_DESCRIBE=${{needs.pre-build.outputs.describe}} -e CI_ETL_TAG=${{needs.pre-build.outputs.tag}} -e CI_ETL_UID=${{needs.pre-build.outputs.uid}} -e CI=true
+          run: |
+            git config --global --add safe.directory /code
+            ./easybuild.sh build -64 -mod
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lnx64-mod
+          path: |
+            build/legacy/cgame*.so
+            build/legacy/ui*.so
+            build/legacy/qagame*.so
+            build/legacy/tvgame*.so
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: incomplete-mod-pk3
+          path: build/legacy/legacy_*.pk3
+          if-no-files-found: error
+
+  osx-mod:
+    runs-on: macos-15
+    needs: pre-build
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: brew bundle
+
+      - name: Build
+        env:
+          SDKROOT: /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+          DEVELOPER_DIR: /Library/Developer/CommandLineTools
+          CI_ETL_DESCRIBE: ${{needs.pre-build.outputs.describe}}
+          CI_ETL_TAG: ${{needs.pre-build.outputs.tag}}
+          CI_ETL_UID: ${{needs.pre-build.outputs.uid}}
+        shell: bash
+        run: |
+          ./easybuild.sh build -64 -mod --osx=10.10 --osx-arc="x86_64;arm64" -j
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: osx-mod
+          path: |
+            build/legacy/cgame_mac
+            build/legacy/ui_mac
+            build/legacy/qagame_mac
+            build/legacy/tvgame_mac
+          if-no-files-found: error
+
+  win64-mod:
+    runs-on: windows-2022
+    needs: pre-build
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Build
+        shell: cmd
+        env:
+          CI_ETL_DESCRIBE: ${{needs.pre-build.outputs.describe}}
+          CI_ETL_TAG: ${{needs.pre-build.outputs.tag}}
+          CI_ETL_UID: ${{needs.pre-build.outputs.uid}}
+        run: |
+          call .\easybuild.bat build -mod -64
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: win64-mod
+          path: |
+            build/legacy/cgame*.dll
+            build/legacy/ui*.dll
+            build/legacy/qagame*.dll
+            build/legacy/tvgame*.dll
+          if-no-files-found: error
+
+  # Packs every platform's client libraries into the one legacy_*.pk3 that all downloads ship
+  mod-merger:
+    runs-on: ubuntu-latest
+    needs: [pre-build, lnx64-mod, osx-mod, win64-mod]
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: incomplete-mod-pk3
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "*-mod"
+          path: platforms
+          merge-multiple: true
+
+      - name: Create supported platform manifest
+        run: echo "win_x86_64 lnx_x86_64 macos_x86_64 macos_aarch64" > platforms.manifest
+
+      - name: Merge mod files
+        run: zip -rvj -MM legacy_*.pk3 platforms.manifest platforms/cgame* platforms/ui*
+
+      - name: Record pk3 checksum
+        run: sha256sum legacy_*.pk3 | tee legacy-pk3.sha256
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: All-mods
+          path: |
+            legacy_*.pk3
+            legacy-pk3.sha256
+          if-no-files-found: error
+
+  lnx64:
+    runs-on: ubuntu-latest
+    needs: [pre-build, mod-merger]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Build
+        uses: maus007/docker-run-action-fork@v1
+        with:
+          image: etlegacy/lnx-build:latest
+          options: -v ${{ github.workspace }}:/code -e CI_ETL_DESCRIBE=${{needs.pre-build.outputs.describe}} -e CI_ETL_TAG=${{needs.pre-build.outputs.tag}} -e CI_ETL_UID=${{needs.pre-build.outputs.uid}} -e CI=true
+          run: |
+            git config --global --add safe.directory /code
+            ./easybuild.sh build -64
+
+      - name: Change Owner of Container Working Directory
+        run: sudo chown -R "$(id -u):$(id -g)" .
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: All-mods
+          path: build/legacy
+
+      - name: Generate packages
+        uses: maus007/docker-run-action-fork@v1
+        with:
+          image: etlegacy/lnx-build:latest
+          options: -v ${{ github.workspace }}:/code -e CI_ETL_DESCRIBE=${{needs.pre-build.outputs.describe}} -e CI_ETL_TAG=${{needs.pre-build.outputs.tag}} -e CI=true
+          run: |
+            cd build/
+            rm -f legacy/legacy-pk3.sha256
+            cpack
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lnx64-packages
+          path: |
+            build/etlegacy-*.tar.gz
+            build/etlegacy-*.sh
+          if-no-files-found: error
+
+  osx:
+    runs-on: macos-15
+    needs: [pre-build, mod-merger]
+    env:
+      CI_ETL_DESCRIBE: ${{needs.pre-build.outputs.describe}}
+      CI_ETL_TAG: ${{needs.pre-build.outputs.tag}}
+      CI_ETL_UID: ${{needs.pre-build.outputs.uid}}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          brew bundle
+          brew install freetype librsvg graphicsmagick imagemagick
+
+      - name: Build
+        env:
+          SDKROOT: /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+          DEVELOPER_DIR: /Library/Developer/CommandLineTools
+        shell: bash
+        run: ./easybuild.sh build -64 --osx=10.10 --osx-arc="x86_64;arm64" -j
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: All-mods
+          path: build/legacy
+
+      - name: Generate packages
+        shell: bash
+        run: |
+          rm -f build/legacy/legacy-pk3.sha256
+          ./easybuild.sh package -64 --osx=10.10 --osx-arc="x86_64;arm64" -j
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: osx-packages
+          path: |
+            build/etlegacy-*.tar.gz
+            build/etlegacy-*.dmg
+          if-no-files-found: error
+
+  # Unsigned: no code signing certificate, by choice
+  win64:
+    runs-on: windows-2022
+    needs: [pre-build, mod-merger]
+    env:
+      CI_ETL_DESCRIBE: ${{needs.pre-build.outputs.describe}}
+      CI_ETL_TAG: ${{needs.pre-build.outputs.tag}}
+      CI_ETL_UID: ${{needs.pre-build.outputs.uid}}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Build
+        shell: cmd
+        run: |
+          call .\easybuild.bat build -64
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: All-mods
+          path: build/legacy
+
+      - name: Generate packages
+        shell: cmd
+        working-directory: build
+        run: |
+          del legacy\legacy-pk3.sha256
+          cpack
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: win64-packages
+          path: |
+            build/etlegacy-*.exe
+            build/etlegacy-*.zip
+          if-no-files-found: error
