@@ -5156,6 +5156,16 @@ void FS_InitFilesystem(void)
 	// try to start up normally
 	FS_Startup(BASEGAME);
 
+#ifndef DEDICATED
+	// public builds can't ship the W:ET assets, so fetch them on first launch
+	if (!FS_FOpenFileRead("pak0.pk3", NULL, qfalse) &&
+	    Sys_DownloadGameData(FS_BuildOSPath(fs_homepath->string, BASEGAME, NULL)))
+	{
+		FS_Shutdown(qfalse);
+		FS_Startup(BASEGAME);
+	}
+#endif
+
 	FS_CheckRequiredFiles(0);
 
 	Q_strncpyz(lastValidBase, fs_basepath->string, sizeof(lastValidBase));
