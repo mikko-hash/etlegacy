@@ -266,7 +266,9 @@ jobs:
           test -s "$app/Contents/Resources/etmain/pak0.pk3"
           test -d "$app/Contents/Resources/legacy"
           ls -la "$app/Contents/MacOS/" "$app/Contents/Resources/legacy"
-          lipo -info "$app/Contents/MacOS/etl"
+          exe=$(plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")
+          lipo -info "$app/Contents/MacOS/$exe"
+          for p in pak0 pak1 pak2; do unzip -tq "$app/Contents/Resources/etmain/$p.pk3"; done
 
       - uses: actions/upload-artifact@v7
         with:
