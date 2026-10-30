@@ -307,3 +307,36 @@ jobs:
             build/etlegacy-*.exe
             build/etlegacy-*.zip
           if-no-files-found: error
+
+  # One rolling prerelease per branch: "latest" from master, "test-<branch>" from the rest.
+  # Contains no W:ET data; the game downloads it on first launch.
+  release:
+    runs-on: ubuntu-latest
+    needs: [pre-build, lnx64, osx, win64]
+    if: github.event_name == 'push' && github.ref_type == 'branch'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: "{mac-app-dmg,win64-packages,lnx64-packages}"
+          merge-multiple: true
+
+      - name: Publish rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          DESCRIBE: ${{ needs.pre-build.outputs.describe }}
+        run: |
+          if find artifacts -iname 'pak[0-2].pk3' | grep -q .; then echo "W:ET data must not be released"; exit 1; fi
+          if [ "$BRANCH" = master ]; then tag=latest; else tag="test-$(echo "$BRANCH" | tr '/' '-')"; fi
+          mv artifacts/ET-Legacy-*.dmg artifacts/ET-Legacy-macOS.dmg
+          sed "s|/releases/download/latest/|/releases/download/$tag/|" misc/macos/install.sh > artifacts/install.sh
+          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" --prerelease --target "$GITHUB_SHA" \
+            --title "ET Legacy $DESCRIBE ($BRANCH)" \
+            --notes "Built from $GITHUB_SHA. Mac: curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/install.sh | sh" \
+            artifacts/*
