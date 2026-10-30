@@ -440,6 +440,10 @@ typedef struct
 
 	qboolean benchmarking;
 	qboolean resetTimedemoCvar;
+
+	qboolean padConnected;          ///< a game controller is open
+	float padStick[4];              ///< raw sticks in -1..1: left x, left y, right x, right y (y down is positive)
+	int padTurnBoostTime;           ///< msec the right stick has been held at the edge
 } clientStatic_t;
 
 extern clientStatic_t cls;

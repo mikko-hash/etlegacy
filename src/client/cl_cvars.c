@@ -92,6 +92,16 @@ cvar_t *j_forward_axis;
 cvar_t *j_side_axis;
 cvar_t *j_up_axis;
 
+cvar_t *pad_aim;
+cvar_t *pad_sensitivity;
+cvar_t *pad_sensitivityY;
+cvar_t *pad_adsMultiplier;
+cvar_t *pad_deadzoneLeft;
+cvar_t *pad_deadzoneRight;
+cvar_t *pad_responseCurve;
+cvar_t *pad_invertY;
+cvar_t *pad_turnBoost;
+
 cvar_t *cl_activeAction;
 
 cvar_t *cl_autorecord;
@@ -225,6 +235,24 @@ void CL_InitCvars()
 	Cvar_CheckRange(j_forward_axis, 0, MAX_JOYSTICK_AXIS - 1, qtrue);
 	Cvar_CheckRange(j_side_axis, 0, MAX_JOYSTICK_AXIS - 1, qtrue);
 	Cvar_CheckRange(j_up_axis, 0, MAX_JOYSTICK_AXIS - 1, qtrue);
+
+	// controller aiming, see CL_GamepadMove
+	pad_aim           = Cvar_Get("pad_aim", "1", CVAR_ARCHIVE_ND);
+	pad_sensitivity   = Cvar_Get("pad_sensitivity", "6", CVAR_ARCHIVE_ND);
+	pad_sensitivityY  = Cvar_Get("pad_sensitivityY", "6", CVAR_ARCHIVE_ND);
+	pad_adsMultiplier = Cvar_Get("pad_adsMultiplier", "1.0", CVAR_ARCHIVE_ND);
+	pad_deadzoneLeft  = Cvar_Get("pad_deadzoneLeft", "0.12", CVAR_ARCHIVE_ND);
+	pad_deadzoneRight = Cvar_Get("pad_deadzoneRight", "0.10", CVAR_ARCHIVE_ND);
+	pad_responseCurve = Cvar_Get("pad_responseCurve", "0", CVAR_ARCHIVE_ND);
+	pad_invertY       = Cvar_Get("pad_invertY", "0", CVAR_ARCHIVE_ND);
+	pad_turnBoost     = Cvar_Get("pad_turnBoost", "1", CVAR_ARCHIVE_ND);
+
+	Cvar_CheckRange(pad_sensitivity, 1, 20, qfalse);
+	Cvar_CheckRange(pad_sensitivityY, 1, 20, qfalse);
+	Cvar_CheckRange(pad_adsMultiplier, 0.1f, 3.0f, qfalse);
+	Cvar_CheckRange(pad_deadzoneLeft, 0.0f, 0.9f, qfalse);
+	Cvar_CheckRange(pad_deadzoneRight, 0.0f, 0.9f, qfalse);
+	Cvar_CheckRange(pad_responseCurve, 0, 2, qtrue);
 
 	// make these cvars visible to cgame
 	cl_demorecording = Cvar_Get("cl_demorecording", "0", CVAR_ROM);

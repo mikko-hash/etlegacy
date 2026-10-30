@@ -823,6 +823,54 @@ void IN_PrintJoystickInfo_f(void)
 }
 
 /**
+ * @brief Give a controller a console shooter layout unless the player already bound its buttons
+ *
+ * Left stick moves and right stick aims (CL_GamepadMove), so only the buttons need binds.
+ */
+static void IN_GamepadDefaultBinds(void)
+{
+	static const struct
+	{
+		int key;
+		const char *cmd;
+	} binds[] =
+	{
+		{ K_PAD0_RIGHTTRIGGER,      "+attack"     },
+		{ K_PAD0_LEFTTRIGGER,       "weapalt"     },
+		{ K_PAD0_A,                 "+moveup"     },
+		{ K_PAD0_B,                 "+movedown"   },
+		{ K_PAD0_X,                 "+reload"     },
+		{ K_PAD0_Y,                 "weapnext"    },
+		{ K_PAD0_LEFTSHOULDER,      "+activate"   },
+		{ K_PAD0_RIGHTSHOULDER,     "weapprev"    },
+		{ K_PAD0_LEFTSTICK_CLICK,   "+sprint"     },
+		{ K_PAD0_RIGHTSTICK_CLICK,  "+prone"      },
+		{ K_PAD0_DPAD_UP,           "+mapexpand"  },
+		{ K_PAD0_DPAD_DOWN,         "mp_quickmessage" },
+		{ K_PAD0_DPAD_LEFT,         "+leanleft"   },
+		{ K_PAD0_DPAD_RIGHT,        "+leanright"  },
+		{ K_PAD0_START,             "togglemenu"  },
+		{ K_PAD0_BACK,              "+scores"     },
+	};
+	int i;
+
+	for (i = 0; i < (int)ARRAY_LEN(binds); i++)
+	{
+		char *bind = Key_GetBinding(binds[i].key);
+
+		if (bind && *bind)
+		{
+			return; // the player has a layout of their own, leave all of it alone
+		}
+	}
+
+	for (i = 0; i < (int)ARRAY_LEN(binds); i++)
+	{
+		Key_SetBinding(binds[i].key, binds[i].cmd);
+	}
+}
+
+/**
  * @brief Inits game controller input devices
  */
 static void IN_InitJoystick(void)
@@ -848,8 +896,10 @@ static void IN_InitJoystick(void)
 		SDL_JoystickClose(stick);
 	}
 
-	stick   = NULL;
-	gamepad = NULL;
+	stick            = NULL;
+	gamepad          = NULL;
+	cls.padConnected = qfalse;
+	Com_Memset(cls.padStick, 0, sizeof(cls.padStick));
 	Com_Memset(&stick_state, '\0', sizeof(stick_state));
 
 	if (!SDL_WasInit(SDL_INIT_JOYSTICK))
@@ -902,6 +952,13 @@ static void IN_InitJoystick(void)
 		gamepad = SDL_GameControllerOpen(in_joystickNo->integer);
 	}
 
+	if (gamepad)
+	{
+		Com_Printf("Controller '%s' connected\n", SDL_GameControllerName(gamepad));
+		IN_GamepadDefaultBinds();
+	}
+	cls.padConnected = gamepad != NULL;
+
 	SDL_JoystickEventState(SDL_QUERY);
 	SDL_GameControllerEventState(SDL_QUERY);
 }
@@ -930,6 +987,9 @@ static void IN_ShutdownJoystick(void)
 		SDL_JoystickClose(stick);
 		stick = NULL;
 	}
+
+	cls.padConnected = qfalse;
+	Com_Memset(cls.padStick, 0, sizeof(cls.padStick));
 
 	SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
@@ -1010,6 +1070,12 @@ static void IN_GamepadMove(void)
 	qboolean translatedAxesSet[MAX_JOYSTICK_AXIS];
 
 	SDL_GameControllerUpdate();
+
+	// raw sticks for CL_GamepadMove, which applies dead zones, curves and sensitivity
+	cls.padStick[0] = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_LEFTX) / 32767.0f;
+	cls.padStick[1] = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_LEFTY) / 32767.0f;
+	cls.padStick[2] = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_RIGHTX) / 32767.0f;
+	cls.padStick[3] = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_RIGHTY) / 32767.0f;
 
 	// check buttons
 	for (i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++)
@@ -1751,6 +1817,22 @@ static void IN_ProcessEvents(void)
 				break;
 			}
 			break;
+		case SDL_CONTROLLERDEVICEADDED:
+			// plugging in a controller picks it up without a restart
+			if (in_joystick->integer && !gamepad)
+			{
+				Cvar_Set("in_joystickNo", va("%i", e.cdevice.which));
+				IN_InitJoystick();
+			}
+			break;
+		case SDL_CONTROLLERDEVICEREMOVED:
+			if (gamepad && e.cdevice.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamepad)))
+			{
+				Com_Printf("Controller disconnected\n");
+				Key_ClearStates();
+				IN_InitJoystick(); // opens another controller if one is still plugged in
+			}
+			break;
 		case SDL_CONTROLLERAXISMOTION:
 			if (!e.caxis.axis && !e.caxis.value)
 			{
@@ -1966,7 +2048,7 @@ void IN_Init(void)
 
 	in_nograb = Cvar_Get("in_nograb", "0", CVAR_ARCHIVE);
 
-	in_joystick          = Cvar_Get("in_joystick", "0", CVAR_ARCHIVE_ND | CVAR_LATCH);
+	in_joystick          = Cvar_Get("in_joystick", "1", CVAR_ARCHIVE_ND | CVAR_LATCH);
 	in_joystickThreshold = Cvar_Get("in_joystickThreshold", "0.25", CVAR_ARCHIVE_ND);
 
 	SDL_StartTextInput();
