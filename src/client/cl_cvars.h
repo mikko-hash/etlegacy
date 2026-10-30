@@ -122,6 +122,16 @@ extern cvar_t *j_forward_axis;
 extern cvar_t *j_side_axis;
 extern cvar_t *j_up_axis;
 
+extern cvar_t *pad_aim;
+extern cvar_t *pad_sensitivity;
+extern cvar_t *pad_sensitivityY;
+extern cvar_t *pad_adsMultiplier;
+extern cvar_t *pad_deadzoneLeft;
+extern cvar_t *pad_deadzoneRight;
+extern cvar_t *pad_responseCurve;
+extern cvar_t *pad_invertY;
+extern cvar_t *pad_turnBoost;
+
 extern cvar_t *cl_timedemo;
 
 extern cvar_t *cl_activeAction;

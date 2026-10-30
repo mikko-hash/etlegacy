@@ -42,25 +42,31 @@ menuDef {
 	SIDEBUTTON(5, "MOUSE", close MENU_NAME; open options_controls_input)
 	SIDEBUTTON(6, "MISCELLANEOUS", close MENU_NAME; open options_controls_miscellaneous)
 	SIDEBUTTON(7, "FIRE-TEAMS", close MENU_NAME; open options_controls_fireteams)
-	SIDEBUTTON_ACTIVE(8, "JOYSTICK", close MENU_NAME; open options_controls_joystick)
+	SIDEBUTTON_ACTIVE(8, "CONTROLLER", close MENU_NAME; open options_controls_joystick)
 	SIDEBUTTON(9, "SHOUTCASTER", close MENU_NAME; open options_controls_shoutcaster)
 	SIDEBUTTON(10, "SELECTION MENUS", close MENU_NAME; open options_controls_selection_menus)
 
-	SUBWINDOW(OPTION_SUBW_X, OPTION_SUBW_Y, OPTION_SUBW_W, OPTION_SUBW_H, "JOYSTICK")
-	
-	MULTI(OPTION_ITEM_POS(1), _("Enable Joysticks:"), .2, 8, "in_joystick", cvarFloatList { "No" 0 "Yes" 1 }, _("Toggle joystick initialization (requires vid_restart)"))
-	NUMERICFIELD(OPTION_EF_POS(2), _("Use Joystick #:"), .2, 8, "in_joystickNo", 3, _("Specify active joystick"))
-	MULTI(OPTION_ITEM_POS(3), _("Analog Joystick:"), .2, 8, "in_joystickUseAnalog", cvarFloatList { "No" 0 "Yes" 1 }, _("Toggle analog joystick"))
-	CVARFLOATLABEL(OPTION_ITEM_POS(4), "j_forward", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
-	SLIDER(OPTION_ITEM_POS(4), _("Forward-Back Sensitivity:"), .2, 8, "j_forward" 5 - 15 15, _("Set joystick forward-back sensitivity"))
-	CVARFLOATLABEL(OPTION_ITEM_POS(5), "j_side", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
-	SLIDER(OPTION_ITEM_POS(5), _("Left-Right Sensitivity:"), .2, 8, "j_side" 5 - 15 15, _("Set joystick left-right sensitivity"))
-	CVARFLOATLABEL(OPTION_ITEM_POS(6), "j_up", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
-	SLIDER(OPTION_ITEM_POS(6), _("Up-Down Sensitivity:"), .2, 8, "j_up" 5 - 15 15, _("Set joystick up-down sensitivity"))
-	CVARFLOATLABEL(OPTION_ITEM_POS(7), "j_pitch", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
-	SLIDER(OPTION_ITEM_POS(7), _("Pitch:"), .2, 8, "j_pitch" 5 - 15 15, _("Set pitch sensitivity"))
-	CVARFLOATLABEL(OPTION_ITEM_POS(8), "j_yaw", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
-	SLIDER(OPTION_ITEM_POS(8), _("Yaw:"), .2, 8, "j_yaw" 5 - 15 15, _("Set yaw sensitivity"))
+	SUBWINDOW(OPTION_SUBW_X, OPTION_SUBW_Y, OPTION_SUBW_W, OPTION_SUBW_H, "CONTROLLER")
+
+	// Laid out like the controller settings of console shooters. Buttons are bound in the
+	// other tabs by pressing a controller button, like any key.
+	MULTI(OPTION_ITEM_POS(1), _("Controller:"), .2, 8, "in_joystick", cvarFloatList { "Off" 0 "On" 1 }, _("Use a game controller (takes effect after vid_restart)"))
+	MULTI(OPTION_ITEM_POS(2), _("Aim Response Curve:"), .2, 8, "pad_responseCurve", cvarFloatList { "Standard" 0 "Linear" 1 "Dynamic" 2 }, _("Standard: fine near the centre. Linear: direct. Dynamic: very fine near the centre, fast at the edge"))
+	CVARFLOATLABEL(OPTION_ITEM_POS(3), "pad_sensitivity", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
+	SLIDER(OPTION_ITEM_POS(3), _("Horizontal Stick Sensitivity:"), .2, 8, "pad_sensitivity" 6 1 20, _("How fast the right stick turns you left and right (1-20)"))
+	CVARFLOATLABEL(OPTION_ITEM_POS(4), "pad_sensitivityY", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
+	SLIDER(OPTION_ITEM_POS(4), _("Vertical Stick Sensitivity:"), .2, 8, "pad_sensitivityY" 6 1 20, _("How fast the right stick looks up and down (1-20)"))
+	CVARFLOATLABEL(OPTION_ITEM_POS(5), "pad_adsMultiplier", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
+	SLIDER(OPTION_ITEM_POS(5), _("ADS Sensitivity Multiplier:"), .2, 8, "pad_adsMultiplier" 1 0.1 3, _("Aiming speed while zoomed or scoped, on top of the zoom itself"))
+	MULTI(OPTION_ITEM_POS(6), _("Invert Vertical Look:"), .2, 8, "pad_invertY", cvarFloatList { "Off" 0 "On" 1 }, _("Push the right stick up to look down"))
+	MULTI(OPTION_ITEM_POS(7), _("Turn Boost:"), .2, 8, "pad_turnBoost", cvarFloatList { "Off" 0 "On" 1 }, _("Turn faster after holding the right stick at the edge"))
+	CVARFLOATLABEL(OPTION_ITEM_POS(8), "pad_deadzoneLeft", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
+	SLIDER(OPTION_ITEM_POS(8), _("Left Stick Deadzone:"), .2, 8, "pad_deadzoneLeft" 0.12 0 0.5, _("How far the left stick moves before you start walking"))
+	CVARFLOATLABEL(OPTION_ITEM_POS(9), "pad_deadzoneRight", .2, ITEM_ALIGN_RIGHT, $evalfloat(SLIDER_LABEL_X), 8)
+	SLIDER(OPTION_ITEM_POS(9), _("Right Stick Deadzone:"), .2, 8, "pad_deadzoneRight" 0.10 0 0.5, _("How far the right stick moves before you start turning. Lower it until the view drifts, then raise it a little"))
+	MULTI(OPTION_ITEM_POS(10), _("Stick Aiming:"), .2, 8, "pad_aim", cvarFloatList { "On" 1 "Off" 0 }, _("Turn off to bind the sticks yourself"))
+
+	BUTTON(OPTION_BUTTON_POS(12), _("DEFAULT BUTTON LAYOUT"), .24, 11, exec "padDefaultBinds")
 
 #ifdef FUI
 	LOWERBUTTON(1, _("MSGID_MENU_BACK"), close MENU_NAME; open main)

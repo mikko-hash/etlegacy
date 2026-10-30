@@ -947,6 +947,120 @@ void CL_JoystickMove(usercmd_t *cmd)
 }
 
 /**
+ * @brief Remove a radial dead zone from a stick and rescale what is left to 0..1
+ * @param[in,out] x
+ * @param[in,out] y
+ * @param[in] deadzone
+ * @return the rescaled deflection
+ */
+static float CL_PadDeadzone(float *x, float *y, float deadzone)
+{
+	float mag = sqrtf(*x * *x + *y * *y);
+	float scaled;
+
+	if (mag <= deadzone || mag <= 0.0f)
+	{
+		*x = *y = 0.0f;
+		return 0.0f;
+	}
+
+	// a worn stick rarely reaches the rim, so treat the last 2% as full
+	scaled = (mag - deadzone) / (0.98f - deadzone);
+	if (scaled > 1.0f)
+	{
+		scaled = 1.0f;
+	}
+
+	*x = *x / mag * scaled;
+	*y = *y / mag * scaled;
+	return scaled;
+}
+
+/**
+ * @brief Shape the right stick deflection like the console shooter curves
+ * @param[in] m deflection 0..1
+ * @return
+ */
+static float CL_PadCurve(float m)
+{
+	switch (pad_responseCurve->integer)
+	{
+	case 1:     // linear
+		return m;
+	case 2:     // dynamic: very fine near the centre, fast at the rim
+		return 0.15f * m + 0.85f * m * m * m;
+	default:    // standard
+		return m * m;
+	}
+}
+
+/**
+ * @brief Controller movement and aiming: left stick moves, right stick turns
+ *
+ * Turn speed is set in degrees per second from pad_sensitivity (1-20, 6 by default),
+ * slowed down by the weapon zoom like the mouse is and by pad_adsMultiplier on top.
+ * Holding the right stick at the rim speeds turning up after a moment (pad_turnBoost).
+ * @param[in,out] cmd
+ */
+static void CL_GamepadMove(usercmd_t *cmd)
+{
+	float lx, ly, rx, ry, m, dt, yawRate, pitchRate, zoom;
+
+	if (!cls.padConnected || !pad_aim->integer || Key_GetCatcher())
+	{
+		cls.padTurnBoostTime = 0;
+		return;
+	}
+
+	lx = cls.padStick[0];
+	ly = cls.padStick[1];
+	rx = cls.padStick[2];
+	ry = cls.padStick[3];
+
+	CL_PadDeadzone(&lx, &ly, pad_deadzoneLeft->value);
+	cmd->rightmove   = ClampChar(cmd->rightmove + (int)(lx * 127));
+	cmd->forwardmove = ClampChar(cmd->forwardmove - (int)(ly * 127));
+
+	m = CL_PadDeadzone(&rx, &ry, pad_deadzoneRight->value);
+	if (m <= 0.0f)
+	{
+		cls.padTurnBoostTime = 0;
+		return;
+	}
+
+	// keep the stick's direction, shape only how far it is pushed
+	rx *= CL_PadCurve(m) / m;
+	ry *= CL_PadCurve(m) / m;
+
+	dt        = 0.001f * cls.frametime;
+	yawRate   = 60.0f + 25.0f * pad_sensitivity->value;            // 210 deg/s at the default 6
+	pitchRate = 0.8f * (60.0f + 25.0f * pad_sensitivityY->value);
+
+	zoom = cl.cgameSensitivity > 0.0f ? cl.cgameSensitivity : 1.0f;
+	if (zoom < 0.999f)
+	{
+		zoom *= pad_adsMultiplier->value;
+		cls.padTurnBoostTime = 0;
+	}
+	else if (pad_turnBoost->integer && m >= 0.95f && Q_fabs(rx) > Q_fabs(ry))
+	{
+		// after 0.25 s at the rim, ramp up to 1.8x over the next 0.3 s
+		cls.padTurnBoostTime += cls.frametime;
+		if (cls.padTurnBoostTime > 250)
+		{
+			yawRate *= 1.0f + 0.8f * MIN(1.0f, (cls.padTurnBoostTime - 250) / 300.0f);
+		}
+	}
+	else
+	{
+		cls.padTurnBoostTime = 0;
+	}
+
+	cl.viewangles[YAW]   -= rx * yawRate * zoom * dt;
+	cl.viewangles[PITCH] += (pad_invertY->integer ? -ry : ry) * pitchRate * zoom * dt;
+}
+
+/**
  * @brief CL_MouseMove
  * @param[in,out] cmd
  */
@@ -1116,6 +1230,9 @@ usercmd_t CL_CreateCmd(void)
 
 	// get basic movement from joystick
 	CL_JoystickMove(&cmd);
+
+	// controller sticks
+	CL_GamepadMove(&cmd);
 
 	// check to make sure the angles haven't wrapped
 	if (cl.viewangles[PITCH] - oldAngles[PITCH] > 90)
