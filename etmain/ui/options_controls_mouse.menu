@@ -42,7 +42,7 @@ menuDef {
 	SIDEBUTTON_ACTIVE(5, "MOUSE", close MENU_NAME; open options_controls_input)
 	SIDEBUTTON(6, "MISCELLANEOUS", close MENU_NAME; open options_controls_miscellaneous)
 	SIDEBUTTON(7, "FIRE-TEAMS", close MENU_NAME; open options_controls_fireteams)
-	SIDEBUTTON(8, "JOYSTICK", close MENU_NAME; open options_controls_joystick)
+	SIDEBUTTON(8, "CONTROLLER", close MENU_NAME; open options_controls_joystick)
 	SIDEBUTTON(9, "SHOUTCASTER", close MENU_NAME; open options_controls_shoutcaster)
 	SIDEBUTTON(10, "SELECTION MENUS", close MENU_NAME; open options_controls_selection_menus)
 

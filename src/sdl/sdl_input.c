@@ -827,7 +827,7 @@ void IN_PrintJoystickInfo_f(void)
  *
  * Left stick moves and right stick aims (CL_GamepadMove), so only the buttons need binds.
  */
-static void IN_GamepadDefaultBinds(void)
+static void IN_GamepadDefaultBinds(qboolean force)
 {
 	static const struct
 	{
@@ -858,7 +858,7 @@ static void IN_GamepadDefaultBinds(void)
 	{
 		char *bind = Key_GetBinding(binds[i].key);
 
-		if (bind && *bind)
+		if (!force && bind && *bind)
 		{
 			return; // the player has a layout of their own, leave all of it alone
 		}
@@ -871,6 +871,15 @@ static void IN_GamepadDefaultBinds(void)
 }
 
 /**
+ * @brief Console command: put the default controller layout back
+ */
+static void IN_GamepadDefaultBinds_f(void)
+{
+	IN_GamepadDefaultBinds(qtrue);
+	Com_Printf("Default controller layout restored\n");
+}
+
+/**
  * @brief Inits game controller input devices
  */
 static void IN_InitJoystick(void)
@@ -880,6 +889,7 @@ static void IN_InitJoystick(void)
 	//char buf[MAX_CVAR_VALUE_STRING] = "";
 
 	Cmd_AddCommand("joystickInfo", IN_PrintJoystickInfo_f, "Prints joystick info."); // command is valid when in_joystick 0 is set
+	Cmd_AddCommand("padDefaultBinds", IN_GamepadDefaultBinds_f, "Restores the default controller button layout.");
 
 	if (!in_joystick->integer)
 	{
@@ -955,7 +965,7 @@ static void IN_InitJoystick(void)
 	if (gamepad)
 	{
 		Com_Printf("Controller '%s' connected\n", SDL_GameControllerName(gamepad));
-		IN_GamepadDefaultBinds();
+		IN_GamepadDefaultBinds(qfalse);
 	}
 	cls.padConnected = gamepad != NULL;
 
@@ -964,11 +974,23 @@ static void IN_InitJoystick(void)
 }
 
 /**
+ * @brief Reopen controllers after one was plugged in or pulled out
+ */
+static void IN_ReinitJoystick(void)
+{
+	// IN_InitJoystick adds them again
+	Cmd_RemoveCommand("joystickInfo");
+	Cmd_RemoveCommand("padDefaultBinds");
+	IN_InitJoystick();
+}
+
+/**
  * @brief IN_ShutdownJoystick
  */
 static void IN_ShutdownJoystick(void)
 {
 	Cmd_RemoveCommand("joystickInfo");
+	Cmd_RemoveCommand("padDefaultBinds");
 
 	// in_joystick cvar is latched
 	if (!SDL_WasInit(SDL_INIT_JOYSTICK) || !in_joystick->integer)
@@ -1822,7 +1844,7 @@ static void IN_ProcessEvents(void)
 			if (in_joystick->integer && !gamepad)
 			{
 				Cvar_Set("in_joystickNo", va("%i", e.cdevice.which));
-				IN_InitJoystick();
+				IN_ReinitJoystick();
 			}
 			break;
 		case SDL_CONTROLLERDEVICEREMOVED:
@@ -1830,7 +1852,7 @@ static void IN_ProcessEvents(void)
 			{
 				Com_Printf("Controller disconnected\n");
 				Key_ClearStates();
-				IN_InitJoystick(); // opens another controller if one is still plugged in
+				IN_ReinitJoystick(); // opens another controller if one is still plugged in
 			}
 			break;
 		case SDL_CONTROLLERAXISMOTION:
