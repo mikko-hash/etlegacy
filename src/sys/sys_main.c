@@ -157,6 +157,9 @@ char *GlobalGameTitle = CLIENT_WINDOW_TITLE;
 
 static char binaryPath[MAX_OSPATH]  = { 0 };
 static char installPath[MAX_OSPATH] = { 0 };
+#if defined(__APPLE__) && !defined(DEDICATED)
+static char selfContainedBasePath[MAX_OSPATH] = { 0 }; ///< Contents/Resources of a bundle that carries its own etmain
+#endif
 
 /**
  * @brief Sys_SetBinaryPath
@@ -1421,6 +1424,25 @@ int main(int argc, char **argv)
 
 		Sys_SetBinaryPath(parentdir);
 
+		// A self-contained bundle carries the game data in Contents/Resources and the
+		// renderer libraries next to the executable, so it can be dragged to /Applications on its own
+		{
+			char        bundledir[1024];
+			char        testpath[MAX_OSPATH];
+			struct stat st;
+
+			if (CFURLGetFileSystemRepresentation(url, 1, (UInt8 *)bundledir, sizeof(bundledir)))
+			{
+				Com_sprintf(testpath, sizeof(testpath), "%s/Contents/Resources/etmain", bundledir);
+				if (stat(testpath, &st) == 0 && S_ISDIR(st.st_mode))
+				{
+					Com_sprintf(testpath, sizeof(testpath), "%s/Contents/MacOS", bundledir);
+					Sys_SetBinaryPath(testpath);
+					Com_sprintf(selfContainedBasePath, sizeof(selfContainedBasePath), "%s/Contents/Resources", bundledir);
+				}
+			}
+		}
+
 		CFRelease(url);
 		CFRelease(url2);
 	}
@@ -1430,7 +1452,16 @@ int main(int argc, char **argv)
 	Sys_SetBinaryPath(Sys_Dirname(argv[0]));
 #endif
 
-#ifndef __ANDROID__
+#if defined(__APPLE__) && !defined(DEDICATED)
+	if (selfContainedBasePath[0])
+	{
+		Sys_SetDefaultInstallPath(selfContainedBasePath);
+	}
+	else
+	{
+		Sys_SetDefaultInstallPath(DEFAULT_BASEDIR); // Sys_BinaryPath() by default
+	}
+#elif !defined(__ANDROID__)
 	Sys_SetDefaultInstallPath(DEFAULT_BASEDIR); // Sys_BinaryPath() by default
 #else
 	Sys_SetDefaultInstallPath(Cmd_Argv(1)); // Sys_BinaryPath() by default

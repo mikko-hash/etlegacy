@@ -1446,6 +1446,7 @@ void Sys_ShowIP(void);
 qboolean Sys_CheckCD(void);
 
 FILE *Sys_FOpen(const char *ospath, const char *mode);
+qboolean Sys_DownloadGameData(const char *etmainDir);
 qboolean Sys_Mkdir(const char *path);
 
 #ifdef _WIN32

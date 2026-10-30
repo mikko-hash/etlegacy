@@ -231,6 +231,8 @@ if(BUILD_CLIENT OR BUILD_SERVER)
 			target_compile_definitions(engine_libraries INTERFACE CURL_STATICLIB)
 		endif()
 		target_sources(engine_libraries INTERFACE "${SRC}/qcommon/dl_main_curl.c")
+		# client only, the file lives in src/sdl
+		target_compile_definitions(engine_libraries INTERFACE ETL_GAMEDATA_DOWNLOAD)
 	elseif(ANDROID)
 		target_sources(engine_libraries INTERFACE "${SRC}/qcommon/dl_main_android.c")
 	else()
